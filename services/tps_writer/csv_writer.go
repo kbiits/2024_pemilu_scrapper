@@ -10,7 +10,7 @@ import (
 
 var _ pemiluscrapper.TPSResultWriter = (*CSVWriter)(nil)
 var (
-	cols        = []string{"URL", "Suara Total", "Suara Sah", "Suara Tidak Sah", "Paslon 01", "Paslon 02", "Paslon 03"}
+	cols        = []string{"Area code", "URL", "Suara Total", "Suara Sah", "Suara Tidak Sah", "Paslon 01", "Paslon 02", "Paslon 03"}
 	paslonIdMap = map[int]string{
 		1: "100025",
 		2: "100026",
@@ -42,7 +42,7 @@ type CSVWriter struct {
 
 // Write implements pemiluscrapper.TPSResultWriter.
 func (w *CSVWriter) Write(result pemiluscrapper.TPSResultWithMetadata) error {
-	data := []string{result.Url}
+	data := []string{result.Code, result.Url}
 
 	if result.TPSResult.Administrasi != nil {
 		adm := result.TPSResult.Administrasi

@@ -126,3 +126,36 @@ func TestScrapperSvc_BuildStackAreaByAreaCodes(t *testing.T) {
 		})
 	}
 }
+
+func Test_extractTPSAreaCodeFromUrl(t *testing.T) {
+	type args struct {
+		url string
+	}
+	tests := []struct {
+		name string
+		args args
+		want string
+	}{
+		{
+			name: "success with tps url",
+			args: args{
+				url: "https://sirekap-obj-data.kpu.go.id/pemilu/hhcw/ppwp/31/3174/317403/3174031001/3174031001050.json",
+			},
+			want: "3174031001050",
+		},
+		{
+			name: "success with district url",
+			args: args{
+				url: "https://sirekap-obj-data.kpu.go.id/wilayah/pemilu/ppwp/31/3174/317402.json",
+			},
+			want: "317402",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := extractTPSAreaCodeFromUrl(tt.args.url); got != tt.want {
+				t.Errorf("extractTPSAreaCodeFromUrl() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

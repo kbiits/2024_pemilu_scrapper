@@ -7,9 +7,15 @@ type Area struct {
 	Level int    `json:"tingkat"`
 }
 
+type AreaWithUrl struct {
+	Area
+	UrlJson string
+}
+
 type TPSResultWithMetadata struct {
 	TPSResult
-	Url string
+	Url  string
+	Code string
 }
 
 type TPSResult struct {
@@ -25,7 +31,6 @@ type Chart struct {
 	Num100025 int `json:"100025"`
 	Num100026 int `json:"100026"`
 	Num100027 int `json:"100027"`
-	Null      any `json:"null"`
 }
 type Administrasi struct {
 	SuaraSah        int `json:"suara_sah"`

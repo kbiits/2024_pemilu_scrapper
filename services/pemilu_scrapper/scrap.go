@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"slices"
+	"strings"
 
 	"github.com/kbiits/scrap_pemilu/pkg/stack"
 )
@@ -33,8 +34,8 @@ func NewScrapper() *ScrapperSvc {
 	return &ScrapperSvc{}
 }
 
-func (s *ScrapperSvc) GenerateTPSUri() <-chan string {
-	chanResult := make(chan string, 100)
+func (s *ScrapperSvc) GenerateTPSUri() <-chan AreaWithUrl {
+	chanResult := make(chan AreaWithUrl, 100)
 
 	provinces := getAllProvinceCodes()
 
@@ -53,8 +54,8 @@ func (s *ScrapperSvc) GenerateTPSUri() <-chan string {
 
 }
 
-func (s *ScrapperSvc) GenerateTPSUriInArea(stackArea *stack.Stack[Area]) <-chan string {
-	chanResult := make(chan string)
+func (s *ScrapperSvc) GenerateTPSUriInArea(stackArea *stack.Stack[Area]) <-chan AreaWithUrl {
+	chanResult := make(chan AreaWithUrl)
 
 	go func() {
 		s.GenerateTPSUriRecursively(stackArea, chanResult)
@@ -64,7 +65,7 @@ func (s *ScrapperSvc) GenerateTPSUriInArea(stackArea *stack.Stack[Area]) <-chan 
 	return chanResult
 }
 
-func (s *ScrapperSvc) GenerateTPSUriRecursively(parentStack *stack.Stack[Area], chanUri chan<- string) {
+func (s *ScrapperSvc) GenerateTPSUriRecursively(parentStack *stack.Stack[Area], chanUri chan<- AreaWithUrl) {
 	parent, err := parentStack.Peek()
 	if err != nil {
 		panic(err)
@@ -75,7 +76,14 @@ func (s *ScrapperSvc) GenerateTPSUriRecursively(parentStack *stack.Stack[Area], 
 
 	if parent.Level == 5 {
 		tpsResultUrl := buildUrl(baseUrlTPSResult, parentsInOrder)
-		chanUri <- tpsResultUrl
+		areaWithUrl := AreaWithUrl{
+			Area: Area{
+				Code:  extractTPSAreaCodeFromUrl(tpsResultUrl),
+				Level: 5,
+			},
+			UrlJson: tpsResultUrl,
+		}
+		chanUri <- areaWithUrl
 		return
 	}
 
@@ -89,11 +97,11 @@ func (s *ScrapperSvc) GenerateTPSUriRecursively(parentStack *stack.Stack[Area], 
 	}
 }
 
-func (s *ScrapperSvc) StartScrapping(writer TPSResultWriter, chanUrls <-chan string) {
+func (s *ScrapperSvc) StartScrapping(writer TPSResultWriter, chanTps <-chan AreaWithUrl) {
 
 	i := 1
-	for urlToScrap := range chanUrls {
-		req, err := http.NewRequest(http.MethodGet, urlToScrap, nil)
+	for tps := range chanTps {
+		req, err := http.NewRequest(http.MethodGet, tps.UrlJson, nil)
 		if err != nil {
 			panic(err)
 		}
@@ -107,6 +115,7 @@ func (s *ScrapperSvc) StartScrapping(writer TPSResultWriter, chanUrls <-chan str
 		if err != nil {
 			panic(err)
 		}
+		resp.Body.Close()
 
 		var tpsResult TPSResult
 		err = json.Unmarshal(respBytes, &tpsResult)
@@ -116,7 +125,8 @@ func (s *ScrapperSvc) StartScrapping(writer TPSResultWriter, chanUrls <-chan str
 
 		var tpsResultWithMeta = TPSResultWithMetadata{
 			TPSResult: tpsResult,
-			Url:       urlToScrap,
+			Url:       tps.UrlJson,
+			Code:      tps.Code,
 		}
 
 		err = writer.Write(tpsResultWithMeta)
@@ -125,7 +135,7 @@ func (s *ScrapperSvc) StartScrapping(writer TPSResultWriter, chanUrls <-chan str
 			log.Default().Printf("error write tps result. url %s", tpsResultWithMeta.Url)
 		}
 
-		fmt.Printf("[NUM-%d] done scrap %s\n", i, urlToScrap)
+		fmt.Printf("[NUM-%d] done scrapping %s\n", i, tps.UrlJson)
 		i++
 	}
 
@@ -252,4 +262,18 @@ func buildUrl(baseUrl string, parents []Area) string {
 	}
 
 	return url
+}
+
+func extractTPSAreaCodeFromUrl(url string) string {
+	urlSplitted := strings.Split(url, "/")
+	if len(urlSplitted) == 0 {
+		panic("invalid url")
+	}
+
+	lastPart := urlSplitted[len(urlSplitted)-1]
+	if !strings.Contains(lastPart, ".json") {
+		panic("invalid url, not contains .json")
+	}
+
+	return strings.TrimSuffix(lastPart, ".json")
 }
