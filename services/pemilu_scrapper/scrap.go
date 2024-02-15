@@ -8,7 +8,9 @@ import (
 	"net/http"
 	"slices"
 	"strings"
+	"time"
 
+	"github.com/kbiits/scrap_pemilu/pkg/cache"
 	"github.com/kbiits/scrap_pemilu/pkg/stack"
 )
 
@@ -23,6 +25,7 @@ const (
 )
 
 type ScrapperSvc struct {
+	cache *cache.Cache
 }
 type TPSResultWriter interface {
 	Write(result TPSResultWithMetadata) error
@@ -30,8 +33,10 @@ type TPSResultWriter interface {
 	Close()
 }
 
-func NewScrapper() *ScrapperSvc {
-	return &ScrapperSvc{}
+func NewScrapper(cache *cache.Cache) *ScrapperSvc {
+	return &ScrapperSvc{
+		cache: cache,
+	}
 }
 
 func (s *ScrapperSvc) GenerateTPSUri() <-chan AreaWithUrl {
@@ -75,7 +80,7 @@ func (s *ScrapperSvc) GenerateTPSUriRecursively(parentStack *stack.Stack[Area], 
 	slices.Reverse(parentsInOrder)
 
 	if parent.Level == 5 {
-		tpsResultUrl := buildUrl(baseUrlTPSResult, parentsInOrder)
+		tpsResultUrl := buildUrlTPS(baseUrlTPSResult, parentsInOrder)
 		areaWithUrl := AreaWithUrl{
 			Area: Area{
 				Code:  extractTPSAreaCodeFromUrl(tpsResultUrl),
@@ -87,7 +92,7 @@ func (s *ScrapperSvc) GenerateTPSUriRecursively(parentStack *stack.Stack[Area], 
 		return
 	}
 
-	url := buildUrl(baseUrlArea, parentsInOrder)
+	url := buildUrlTPS(baseUrlArea, parentsInOrder)
 	areas := getAreaByCode(url)
 
 	for _, area := range areas {
@@ -100,8 +105,51 @@ func (s *ScrapperSvc) GenerateTPSUriRecursively(parentStack *stack.Stack[Area], 
 func (s *ScrapperSvc) StartScrapping(writer TPSResultWriter, chanTps <-chan AreaWithUrl) {
 
 	i := 1
-	for tps := range chanTps {
-		req, err := http.NewRequest(http.MethodGet, tps.UrlJson, nil)
+	for area := range chanTps {
+		subdistrictResult := s.getFromArea(area)
+		if subdistrictResult.Table == nil {
+			log.Default().Printf("failed to get tps result, empty subdistrict result table, tps code %s", area.Code)
+			continue
+		}
+
+		tpsResult, ex := subdistrictResult.Table[area.Code]
+		if !ex {
+			log.Default().Printf("failed to get tps result, not found tps in table, tps code %s", area.Code)
+			continue
+		}
+
+		tpsResultMetadata := TPSResultWithMetadata{
+			Url:  area.UrlJson,
+			Code: area.Code,
+			TPSResult: TPSResult{
+				Chart: &Chart{
+					Num100025: tpsResult.Num100025,
+					Num100026: tpsResult.Num100026,
+					Num100027: tpsResult.Num100027,
+				},
+			},
+		}
+
+		err := writer.Write(tpsResultMetadata)
+		if err != nil {
+			writer.WriteError(tpsResultMetadata)
+			log.Default().Printf("error write tps result. url %s", tpsResultMetadata.Url)
+		}
+
+		fmt.Printf("[NUM-%d] done scrapping %s\n", i, area.UrlJson)
+		i++
+	}
+
+	writer.Close()
+}
+
+func (s *ScrapperSvc) getFromArea(area AreaWithUrl) SubdistrictResult {
+	areaCodeSubDistrict := string([]rune(area.Code)[:len(area.Code)-3])
+	result := s.cache.SetOrGet(areaCodeSubDistrict, time.Second*30, func() interface{} {
+		urlSplitted := strings.Split(area.UrlJson, "/")
+		url := strings.Join(urlSplitted[:len(urlSplitted)-1], "/") + ".json"
+
+		req, err := http.NewRequest(http.MethodGet, url, nil)
 		if err != nil {
 			panic(err)
 		}
@@ -117,29 +165,22 @@ func (s *ScrapperSvc) StartScrapping(writer TPSResultWriter, chanTps <-chan Area
 		}
 		resp.Body.Close()
 
-		var tpsResult TPSResult
-		err = json.Unmarshal(respBytes, &tpsResult)
+		var subdistrictResult SubdistrictResult
+		err = json.Unmarshal(respBytes, &subdistrictResult)
 		if err != nil {
 			panic(err)
 		}
 
-		var tpsResultWithMeta = TPSResultWithMetadata{
-			TPSResult: tpsResult,
-			Url:       tps.UrlJson,
-			Code:      tps.Code,
-		}
-
-		err = writer.Write(tpsResultWithMeta)
-		if err != nil {
-			writer.WriteError(tpsResultWithMeta)
-			log.Default().Printf("error write tps result. url %s", tpsResultWithMeta.Url)
-		}
-
-		fmt.Printf("[NUM-%d] done scrapping %s\n", i, tps.UrlJson)
-		i++
+		subdistrictResult.Code = areaCodeSubDistrict
+		subdistrictResult.Url = url
+		return subdistrictResult
+	})
+	subdistrictResult, ok := result.(SubdistrictResult)
+	if !ok {
+		panic("invalid type subdistrict result")
 	}
 
-	writer.Close()
+	return subdistrictResult
 }
 
 func (s *ScrapperSvc) BuildStackAreaByAreaCodes(code string) (stackArea *stack.Stack[Area]) {
@@ -243,7 +284,7 @@ func getAreaByCode(url string) []Area {
 	return respJson
 }
 
-func buildUrl(baseUrl string, parents []Area) string {
+func buildUrlTPS(baseUrl string, parents []Area) string {
 	url := baseUrl
 
 	if len(parents) == 0 {

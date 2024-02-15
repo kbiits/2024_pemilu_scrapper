@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func Test_buildUrl(t *testing.T) {
+func Test_buildUrlTPS(t *testing.T) {
 	type args struct {
 		baseUrl string
 		parents []Area
@@ -66,8 +66,8 @@ func Test_buildUrl(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := buildUrl(tt.args.baseUrl, tt.args.parents); got != tt.want {
-				t.Errorf("buildUrl() = %v, want %v", got, tt.want)
+			if got := buildUrlTPS(tt.args.baseUrl, tt.args.parents); got != tt.want {
+				t.Errorf("buildUrlTPS() = %v, want %v", got, tt.want)
 			}
 		})
 	}

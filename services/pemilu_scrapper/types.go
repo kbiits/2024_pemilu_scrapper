@@ -28,9 +28,9 @@ type TPSResult struct {
 	StatusAdm    bool          `json:"status_adm"`
 }
 type Chart struct {
-	Num100025 int `json:"100025"`
-	Num100026 int `json:"100026"`
-	Num100027 int `json:"100027"`
+	Num100025 *int `json:"100025"`
+	Num100026 *int `json:"100026"`
+	Num100027 *int `json:"100027"`
 }
 type Administrasi struct {
 	SuaraSah        int `json:"suara_sah"`
@@ -51,4 +51,10 @@ type Administrasi struct {
 	PenggunaNonDptJ int `json:"pengguna_non_dpt_j"`
 	PenggunaNonDptL int `json:"pengguna_non_dpt_l"`
 	PenggunaNonDptP int `json:"pengguna_non_dpt_p"`
+}
+
+type SubdistrictResult struct {
+	Table map[string]Chart `json:"table"`
+	Code  string           `json:"-"`
+	Url   string           `json:"-"`
 }

@@ -55,9 +55,33 @@ func (w *CSVWriter) Write(result pemiluscrapper.TPSResultWithMetadata) error {
 
 	if result.TPSResult.Chart != nil {
 		chart := result.TPSResult.Chart
-		data = append(data, fmt.Sprintf("%d", chart.Num100025))
-		data = append(data, fmt.Sprintf("%d", chart.Num100026))
-		data = append(data, fmt.Sprintf("%d", chart.Num100027))
+		var (
+			paslon1 string
+			paslon2 string
+			paslon3 string
+		)
+
+		if chart.Num100025 == nil {
+			paslon1 = "null"
+		} else {
+			paslon1 = fmt.Sprintf("%d", *chart.Num100025)
+		}
+
+		if chart.Num100026 == nil {
+			paslon2 = "null"
+		} else {
+			paslon2 = fmt.Sprintf("%d", *chart.Num100026)
+		}
+
+		if chart.Num100027 == nil {
+			paslon3 = "null"
+		} else {
+			paslon3 = fmt.Sprintf("%d", *chart.Num100027)
+		}
+
+		data = append(data, paslon1)
+		data = append(data, paslon2)
+		data = append(data, paslon3)
 	} else {
 		data = append(data, "null", "null", "null")
 	}

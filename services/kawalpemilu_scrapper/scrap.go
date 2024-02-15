@@ -28,6 +28,7 @@ func NewKawalPemiluScrapper(cache *cache.Cache) *KawalPemiluScrapper {
 }
 
 func (s *KawalPemiluScrapper) StartScrapping(writer pemiluscrapper.TPSResultWriter, tpsChan <-chan pemiluscrapper.AreaWithUrl) {
+	i := 1
 	for area := range tpsChan {
 		resultSubDistrict := s.getFromArea(area)
 		tpsNumInStr := []rune(area.Code)[len(area.Code)-3:]
@@ -50,6 +51,8 @@ func (s *KawalPemiluScrapper) StartScrapping(writer pemiluscrapper.TPSResultWrit
 			log.Default().Printf("failed to write tps %s from kawal pemilu", area.Code)
 			writer.WriteError(compatibleKPUResult)
 		}
+		fmt.Printf("[KAWAL PEMILU] num-%d Done scrapping area code %s\n", i, area.Code)
+		i++
 	}
 	writer.Close()
 }

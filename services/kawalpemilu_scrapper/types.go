@@ -27,14 +27,24 @@ type TPSAggregatedData struct {
 }
 
 func (data *TPSAggregatedData) ConvertToCompatibleKPUType(url string, code string) pemiluscrapper.TPSResultWithMetadata {
+	var pas1Val *int
+	var pas2Val *int
+	var pas3Val *int
+
+	if data.TotalCompletedTps > 0 {
+		pas1Val = &data.Pas1
+		pas2Val = &data.Pas2
+		pas3Val = &data.Pas3
+	}
+
 	return pemiluscrapper.TPSResultWithMetadata{
 		Url:  url,
 		Code: code,
 		TPSResult: pemiluscrapper.TPSResult{
 			Chart: &pemiluscrapper.Chart{
-				Num100025: data.Pas1,
-				Num100026: data.Pas2,
-				Num100027: data.Pas3,
+				Num100025: pas1Val,
+				Num100026: pas2Val,
+				Num100027: pas3Val,
 			},
 		},
 	}
